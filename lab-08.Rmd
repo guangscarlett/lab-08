@@ -1,6 +1,6 @@
 ---
 title: "Lab 08 - Predicting rain"
-author: "INSERT NAME HERE"
+author: "SCARLETT GUANG"
 date: "`r Sys.Date()`"
 output: html_document
 ---
@@ -16,13 +16,99 @@ library(tidymodels)
 ```{r, warning=FALSE, message=FALSE}
 library(openintro)
 glimpse(email)
+
+email <- email
 ```
 
 1. What proportion of emails are spam? Calculate the proportion of spam separately for emails with and without the word “winner”.
 
+```{r}
+email %>% 
+  count(spam)
+```
+
+proportion of spam = (367/3554) * 100% = 9.36%
+
+```{r}
+email %>%
+  filter(winner == "no")%>%
+  count(spam)
+```
+percentage of spam w. "winner" = 8.997%
+
+```{r}
+email %>%
+  filter(winner == "yes")%>%
+  count(spam)
+```
+percentage of spam wo. "winner" = 31.25%
+
 2. Fit a logistic regression of `spam` on `winner` and write down the fitted model. Use `predict(..., type = "prob")` to find the predicted probability of spam for each group. Compare them with your previously calculated proportions.  
+```{r}
+spam_rec <- recipe(
+  spam ~ winner,          
+  data = email  
+  )
+summary(spam_rec)
+
+spam_mod <- logistic_reg() %>% 
+  set_engine("glm")
+
+spam_wflow <- workflow() %>% 
+  add_model(spam_mod) %>% 
+  add_recipe(spam_rec)
+
+spam_fit <- logistic_reg() %>%
+  set_engine("glm") %>%
+  fit(spam ~ winner, data = email)
+tidy(spam_fit)
+
+spam_pred <- predict(spam_fit, email, type = "prob")%>%
+  bind_cols(email) 
+spam_pred
+```
+
+
+
 
 3. How about fitting a logistic regression of `spam` on `winner` and `num_char`? Calculate the confusion matrix of the fitted logistic model on this new model, and compare with the confusion matrix result of the previous model, relying on `winner` only. Explain the differences on confusion matrix.
+
+```{r}
+spam_mod_2 <- logistic_reg() %>% 
+  set_engine("glm")%>%
+  fit(spam ~ winner + num_char, data = email)
+
+spam_pred_2 <- predict(spam_fit, email, type = "prob") %>% 
+  bind_cols(email) 
+spam_pred_2
+
+cutoff_prob <- 0.5
+spam_fit_2_tbl<- spam_pred_2 %>%
+  mutate(
+    yes_spam_pred = if_else(.pred_1 > cutoff_prob, "Predicted to be Spam", "Predicted to Not be Spam")
+    ) %>%
+  count(yes_spam_pred, spam) %>% 
+  pivot_wider(names_from = winner, values_from = n)
+
+spam_fit_2_tbl
+
+
+```
+
+
+```{r}
+cutoff_prob <- 0.5
+
+spam_fit_tbl<- spam_pred %>%
+  mutate(
+    yes_spam_pred = if_else(.pred_1 > cutoff_prob, "Predicted to be Spam", "Predicted to Not be Spam")
+    ) %>%
+  count(yes_spam_pred, winner) %>% 
+  pivot_wider(names_from = winner, values_from = n)
+
+spam_fit_tbl
+```
+
 
 **Hint:** `augment()` adds the predicted class (`.pred_class`) to the data.
 It labels an email as spam when its predicted probability is above 0.5.
@@ -66,12 +152,22 @@ weather %>%
 
 ```{r}
 
+weather %>%
+  filter(RainTomorrow == "NA")
+
+weather_noNA <- weather %>%
+  filter(RainTomorrow != "NA")
+
 ```
 
 2. Which cities are the ones with more rain days? To do this, let's analyze the `RainToday` variable. 
 
 ```{r}
 
+weather_noNA %>%
+  group_by(Location)%>%
+  summarise(Avg_rain_days = mean(RainToday == "Yes", na.rm = TRUE))%>%
+  arrange(desc(Avg_rain_days))
 ```
 
 # Exercise 2: Logistic regression
@@ -88,6 +184,10 @@ weather_Portland <- weather_noNA %>%
 1. Try to predict `RainTomorrow` by fitting a linear regression using the variable `RainToday` and print the output using `tidy()`.
 
 ```{r}
+
+linear_reg() %>%
+  set_engine("lm") %>%
+  fit(RainTomorrow ~ RainToday, data = weather_noNA)
 
 ```
 
